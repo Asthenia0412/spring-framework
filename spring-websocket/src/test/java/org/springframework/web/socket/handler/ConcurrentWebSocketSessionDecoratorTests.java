@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator.OverflowStrategy;
 
@@ -193,6 +194,51 @@ class ConcurrentWebSocketSessionDecoratorTests {
 		assertThat(sessionDecorator.getSendTimeLimit()).isEqualTo(42);
 		assertThat(sessionDecorator.getBufferSizeLimit()).isEqualTo(43);
 		assertThat(sessionDecorator.getOverflowStrategy()).isEqualTo(OverflowStrategy.DROP);
+	}
+
+	@Test
+	void bufferedMessageIsFlushedOnCloseWhileSendInProgress() throws Exception {
+		CountDownLatch sendStarted = new CountDownLatch(1);
+		CountDownLatch releaseSend = new CountDownLatch(1);
+
+		TestWebSocketSession session = new TestWebSocketSession() {
+			@Override
+			public void sendMessage(WebSocketMessage<?> message) throws IOException {
+				super.sendMessage(message);
+				sendStarted.countDown();
+				try {
+					releaseSend.await(5, TimeUnit.SECONDS);
+				}
+				catch (InterruptedException ex) {
+					Thread.currentThread().interrupt();
+				}
+			}
+		};
+		session.setOpen(true);
+
+		ConcurrentWebSocketSessionDecorator decorator =
+				new ConcurrentWebSocketSessionDecorator(session, 10 * 1000, 1024);
+
+		Executors.newSingleThreadExecutor().submit(() -> {
+			try {
+				decorator.sendMessage(new TextMessage("slow message"));
+			}
+			catch (IOException ex) {
+				// ignore
+			}
+		});
+		assertThat(sendStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+		TextMessage errorMessage = new TextMessage("ERROR");
+		decorator.sendMessage(errorMessage);
+		assertThat(decorator.getBufferSize()).isGreaterThan(0);
+
+		decorator.close(CloseStatus.PROTOCOL_ERROR);
+
+		releaseSend.countDown();
+		Thread.sleep(100);
+
+		assertThat(session.getSentMessages()).contains(errorMessage);
 	}
 
 	private void sendBlockingMessage(ConcurrentWebSocketSessionDecorator session) throws InterruptedException {

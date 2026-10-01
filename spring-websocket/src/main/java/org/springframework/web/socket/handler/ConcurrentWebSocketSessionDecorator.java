@@ -177,7 +177,7 @@ public class ConcurrentWebSocketSessionDecorator extends WebSocketSessionDecorat
 				break;
 			}
 		}
-		while (!this.buffer.isEmpty() && !shouldNotSend());
+		while (!this.buffer.isEmpty() && !this.limitExceeded);
 	}
 
 	private boolean shouldNotSend() {
@@ -189,7 +189,7 @@ public class ConcurrentWebSocketSessionDecorator extends WebSocketSessionDecorat
 			try {
 				while (true) {
 					WebSocketMessage<?> message = this.buffer.poll();
-					if (message == null || shouldNotSend()) {
+					if (message == null || this.limitExceeded) {
 						break;
 					}
 					this.bufferSize.addAndGet(-message.getPayloadLength());
