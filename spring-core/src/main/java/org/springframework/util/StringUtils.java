@@ -652,6 +652,8 @@ public abstract class StringUtils {
 	 * <li>{@code "myfile.txt"} &rarr; {@code "txt"}
 	 * <li>{@code "my/path/myfile."} &rarr; {@code ""}
 	 * <li>{@code "myfile"} &rarr; {@code null}
+	 * <li>{@code "/home/.gitignore"} &rarr; {@code null}
+	 * <li>{@code ".env"} &rarr; {@code null}
 	 * <li>{@code ""} &rarr; {@code null}
 	 * <li>{@code null} &rarr; {@code null}
 	 * </ul>
@@ -666,17 +668,22 @@ public abstract class StringUtils {
 			return null;
 		}
 
-		int extIndex = path.lastIndexOf(DOT_CHAR);
-		if (extIndex == -1) {
+		int separatorIndex = path.lastIndexOf(FOLDER_SEPARATOR_CHAR);
+		int windowsSeparatorIndex = path.lastIndexOf(WINDOWS_FOLDER_SEPARATOR_CHAR);
+		if (windowsSeparatorIndex > separatorIndex) {
+			separatorIndex = windowsSeparatorIndex;
+		}
+		String filename = (separatorIndex != -1 ? path.substring(separatorIndex + 1) : path);
+
+		int dotIndex = filename.lastIndexOf(DOT_CHAR);
+		if (dotIndex == -1 || dotIndex == 0) {
 			return null;
 		}
-
-		int folderIndex = path.lastIndexOf(FOLDER_SEPARATOR_CHAR);
-		if (folderIndex > extIndex) {
-			return null;
+		if (dotIndex == filename.length() - 1) {
+			return "";
 		}
 
-		return path.substring(extIndex + 1);
+		return filename.substring(dotIndex + 1);
 	}
 
 	/**
@@ -686,17 +693,23 @@ public abstract class StringUtils {
 	 * @return the path with stripped filename extension
 	 */
 	public static String stripFilenameExtension(String path) {
-		int extIndex = path.lastIndexOf(DOT_CHAR);
-		if (extIndex == -1) {
+		int separatorIndex = path.lastIndexOf(FOLDER_SEPARATOR_CHAR);
+		int windowsSeparatorIndex = path.lastIndexOf(WINDOWS_FOLDER_SEPARATOR_CHAR);
+		if (windowsSeparatorIndex > separatorIndex) {
+			separatorIndex = windowsSeparatorIndex;
+		}
+		String filename = (separatorIndex != -1 ? path.substring(separatorIndex + 1) : path);
+
+		int dotIndex = filename.lastIndexOf(DOT_CHAR);
+		if (dotIndex == -1 || dotIndex == 0) {
 			return path;
 		}
-
-		int folderIndex = path.lastIndexOf(FOLDER_SEPARATOR_CHAR);
-		if (folderIndex > extIndex) {
-			return path;
+		if (dotIndex == filename.length() - 1) {
+			return path.substring(0, path.length() - 1);
 		}
 
-		return path.substring(0, extIndex);
+		int extStart = separatorIndex + 1 + dotIndex;
+		return path.substring(0, extStart);
 	}
 
 	/**
